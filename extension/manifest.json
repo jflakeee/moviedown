@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Media to Drive — 공개 미디어 링크 탐지",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "현재 탭에서 공개된 다운로드 링크와 직접 미디어 요청을 감지합니다. 저장 권한이 있는 파일만 사용하세요.",
   "permissions": [
     "activeTab",
@@ -9,8 +9,7 @@
     "webRequest",
     "storage"
   ],
-  "host_permissions": [],
-  "optional_host_permissions": [
+  "host_permissions": [
     "https://*/*",
     "http://*/*"
   ],
