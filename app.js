@@ -1,3 +1,4 @@
+import {analyzePython} from "./python-client.js";
 const $=id=>document.getElementById(id);
 let token="",aborter=null;
 const log=s=>$("status").textContent=s;
@@ -8,7 +9,7 @@ if(sharedMedia){
   const u=new URL(sharedMedia);
   if(["https:","http:"].includes(u.protocol)&&/\.(mp4|webm|mov)$/i.test(u.pathname)&&!u.username&&!u.password){
    $("url").value=u.href;
-   history.replaceState(null,"",location.pathname+location.hash);
+   window.history.replaceState(null,"",location.pathname+location.hash);
    $("status").textContent="확장프로그램에서 탐지한 미디어 주소를 받았습니다. 파일 보관 권한을 확인하고 업로드하세요.";
   }
  }catch{}
@@ -17,14 +18,14 @@ if(sharedMedia){
 function refresh(){const signed=!!token;const allowed=signed&&$("rights").checked;$("upload").disabled=!allowed;$("transfer").disabled=!allowed;$("createFolder").disabled=!signed;$("cancel").disabled=!aborter;$("logout").disabled=!signed}
 $("rights").addEventListener("change",refresh);
 refresh();
-function history(){const items=JSON.parse(localStorage.getItem(key)||"[]");$("history").replaceChildren(...items.map(x=>{const d=document.createElement("div"),a=document.createElement("a");a.href="https://drive.google.com/file/d/"+encodeURIComponent(x.id)+"/view";a.target="_blank";a.rel="noopener noreferrer";a.textContent=x.name+" ("+x.time+")";d.append(a);return d}))}
-history();$("clearHistory").onclick=()=>{localStorage.removeItem(key);history()};
+function renderHistory(){const items=JSON.parse(localStorage.getItem(key)||"[]");$("history").replaceChildren(...items.map(x=>{const d=document.createElement("div"),a=document.createElement("a");a.href="https://drive.google.com/file/d/"+encodeURIComponent(x.id)+"/view";a.target="_blank";a.rel="noopener noreferrer";a.textContent=x.name+" ("+x.time+")";d.append(a);return d}))}
+renderHistory();$("clearHistory").onclick=()=>{localStorage.removeItem(key);renderHistory()};
 $("login").onclick=()=>{const client_id=window.MOVIEDOWN_CONFIG?.googleClientId||"";if(!client_id||!client_id.endsWith(".apps.googleusercontent.com"))return log("사이트 운영자의 Google 로그인 설정이 필요합니다. README를 확인하세요.");if(!window.google?.accounts?.oauth2)return log("Google 인증 스크립트가 로드되지 않았습니다.");google.accounts.oauth2.initTokenClient({client_id,scope:"https://www.googleapis.com/auth/drive.file",callback:r=>{if(r.error)return log("인증 실패: "+r.error);token=r.access_token;refresh();log("Google 로그인 완료")}}).requestAccessToken()};
 $("logout").onclick=()=>{if(token)google.accounts.oauth2.revoke(token,()=>{});token="";refresh();log("로그아웃 완료")};
 function requireAuth(){if(!token)throw Error("Google 로그인이 필요합니다.");if(!$("rights").checked)throw Error("영상 보관 권한을 확인하세요.")}
 async function api(url,options={}){if(!token)throw Error("로그인이 필요합니다.");const h=new Headers(options.headers||{});h.set("Authorization","Bearer "+token);const r=await fetch(url,{...options,headers:h});if(!r.ok)throw Error("Google Drive API "+r.status+" "+(await r.text()).slice(0,150));return r}
 $("createFolder").onclick=async()=>{try{requireAuth();const name=$("newFolder").value.trim();if(!name)throw Error("폴더 이름을 입력하세요.");const r=await api("https://www.googleapis.com/drive/v3/files?fields=id,name",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder"})});const f=await r.json();$("folder").value=f.id;log("폴더 생성 완료: "+f.name)}catch(e){log(e.message)}};
-function record(name,id){if(!id)return;const items=JSON.parse(localStorage.getItem(key)||"[]");items.unshift({name,id,time:new Date().toLocaleString()});localStorage.setItem(key,JSON.stringify(items.slice(0,30)));history()}
+function record(name,id){if(!id)return;const items=JSON.parse(localStorage.getItem(key)||"[]");items.unshift({name,id,time:new Date().toLocaleString()});localStorage.setItem(key,JSON.stringify(items.slice(0,30)));renderHistory()}
 function classify(raw){try{const u=new URL(raw);if(!["https:","http:"].includes(u.protocol))throw Error();if(/\.(mp4|webm|mov)$/i.test(u.pathname))return {kind:"direct",url:u.href,message:"직접 파일 URL입니다. CORS와 HTTP Range 지원이 필요합니다."};return {kind:"page",message:"영상 페이지·스트리밍 주소의 추출은 지원하지 않습니다. 공식 다운로드 파일을 사용하세요."}}catch{return {kind:"invalid",message:"유효한 URL을 입력하세요."}}}
 
 const candidates=$("candidates");
@@ -38,7 +39,6 @@ function officialCandidates(doc,base){
     const label=(a.textContent||"").replace(/\s+/g," ").trim().slice(0,90);
     const isMedia=mediaPath.test(u.pathname);
     const explicit=a.hasAttribute("download")||/\bdownload\b/i.test(a.rel)||/(다운로드|download|파일 받기)/i.test(label);
-    if(!isMedia&&!explicit)continue;
     if(!isMedia&&!explicit)continue;
     found.set(u.href,{url:u.href,label:label||u.pathname.split("/").pop()||"다운로드 링크",direct:isMedia});
   }
@@ -55,11 +55,14 @@ function renderCandidates(items){
     candidates.append(row);
   }
 }
+$("pythonTest").onclick=async()=>{try{log("브라우저 Python을 초기화하고 있습니다...");const result=await analyzePython({operation:"analyze",url:$("url").value});$("pythonStatus").textContent="Python 준비 완료 · "+result.kind+" · "+result.reason;log("Python 분석 엔진 준비 완료")}catch(e){$("pythonStatus").textContent="Python 실행 실패: "+e.message;log(e.message)}};
 $("inspect").onclick=async()=>{
   candidates.textContent="페이지의 공개 링크를 확인하는 중...";
-  const info=classify($("url").value);
-  if(info.kind==="invalid"){candidates.textContent=info.message;return}
-  if(info.kind==="direct"){renderCandidates([{url:info.url,label:"직접 미디어 파일",direct:true}]);return}
+  let info;
+  try{info=await analyzePython({operation:"analyze",url:$("url").value});$("pythonStatus").textContent="Python 분석 활성 · "+(info.format||info.kind)}catch(e){candidates.textContent="Python 분석 실패: "+e.message;return}
+  if(info.kind==="invalid"){candidates.textContent=info.reason;return}
+  if(info.kind==="direct"){renderCandidates([{url:info.url,label:"직접 미디어 파일 ("+info.format+")",direct:true}]);return}
+  if(info.kind==="stream"){candidates.textContent=info.reason;return}
   try{
     const u=new URL($("url").value);
     if(u.protocol!=="https:")throw Error("보안상 HTTPS 페이지만 분석합니다.");
@@ -71,7 +74,9 @@ $("inspect").onclick=async()=>{
     const html=await response.text();
     if(html.length>2_000_000)throw Error("페이지가 너무 큽니다.");
     const doc=new DOMParser().parseFromString(html,"text/html");
-    const items=officialCandidates(doc,response.url);
+    const raw=officialCandidates(doc,response.url);
+    const analyzed=await analyzePython({operation:"candidates",items:raw.map(item=>({...item,base:response.url}))});
+    const items=analyzed.filter(item=>item.kind==="direct"||item.kind==="page").map(item=>({...item,direct:item.kind==="direct"}));
     renderCandidates(items);
     log(items.length+"개의 공개 다운로드 링크 후보를 찾았습니다. 공식 제공 및 저장 권한을 확인하세요.");
   }catch(e){candidates.textContent="페이지 분석 불가: "+e.message+"\n브라우저 CORS 정책으로 다른 사이트의 HTML을 읽지 못할 수 있습니다. 사이트에서 제공한 공식 다운로드 링크를 직접 입력하세요."}
