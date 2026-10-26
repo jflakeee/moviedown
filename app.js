@@ -15,7 +15,7 @@ if(sharedMedia){
  }catch{}
 }
 
-function refresh(){const signed=!!token;const allowed=signed&&$("rights").checked;$("upload").disabled=!allowed;$("transfer").disabled=!allowed;$("createFolder").disabled=!signed;$("cancel").disabled=!aborter;$("logout").disabled=!signed}
+function refresh(){const signed=!!token;$("login").textContent=signed?"로그인됨":"Google 로그인";$("login").disabled=signed;$("login").setAttribute("aria-label",signed?"Google 로그인됨":"Google 로그인");const allowed=signed&&$("rights").checked;$("upload").disabled=!allowed;$("transfer").disabled=!allowed;$("createFolder").disabled=!signed;$("cancel").disabled=!aborter;$("logout").disabled=!signed}
 $("rights").addEventListener("change",refresh);
 refresh();
 function renderHistory(){const items=JSON.parse(localStorage.getItem(key)||"[]");$("history").replaceChildren(...items.map(x=>{const d=document.createElement("div"),a=document.createElement("a");a.href="https://drive.google.com/file/d/"+encodeURIComponent(x.id)+"/view";a.target="_blank";a.rel="noopener noreferrer";a.textContent=x.name+" ("+x.time+")";d.append(a);return d}))}
