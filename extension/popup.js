@@ -7,7 +7,7 @@ async function show(items){
  const results=$("results");results.replaceChildren();
  const unique=[...new Map(items.filter(x=>safeUrl(x.url)).map(x=>[x.url,x])).values()];
  $("status").textContent=unique.length+"개의 공개 미디어 링크 후보를 찾았습니다.";
- if(!unique.length){$("status").textContent+=" 재생 스트림 또는 보호된 콘텐츠는 다운로드 대상으로 제공하지 않습니다.";return}
+ if(!unique.length){$("status").textContent+=" 현재 권한과 탐지 범위에서 직접 파일 주소가 확인되지 않았습니다. DRM 여부를 의미하지 않습니다.";return}
  for(const item of unique){
   const li=document.createElement("li"),a=document.createElement("a");a.href=item.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=item.label||item.url;
   const small=document.createElement("small");small.textContent=item.source==="network"?"네트워크 요청":"페이지에 공개된 링크";
@@ -29,7 +29,7 @@ async function show(items){
  }
 }
 async function scanDom(tab){
- const r=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
+ const r=await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},func:()=>{
   const links=[];
   for(const a of document.querySelectorAll("a[href]")){
    const label=(a.textContent||"").replace(/\s+/g," ").trim().slice(0,100);
@@ -50,10 +50,12 @@ $("scan").onclick=async()=>{
    const granted=await chrome.permissions.request({origins:[origin]});
    if(!granted)throw Error("사이트 접근 권한이 허용되지 않았습니다.");
   }
-  const dom=await scanDom(tab);
+  let dom=[];
+  try{dom=await scanDom(tab)}catch(e){$("status").textContent="일부 프레임 분석 제한: "+e.message}
   const network=await chrome.runtime.sendMessage({type:"getCandidates",tabId:tab.id});
   if(network.error)throw Error(network.error);
   await show([...dom,...(network.items||[])]);
+  if(!dom.length&&!(network.items||[]).length)$("status").textContent+="\n사이트 권한을 허용한 후 페이지를 새로고침하고, 허가된 영상의 공식 다운로드 링크가 표시되는지 확인한 뒤 다시 분석하세요.";
  }catch(e){$("status").textContent="분석 실패: "+e.message}
 };
 $("clear").onclick=async()=>{try{const tab=await getTab();await chrome.runtime.sendMessage({type:"clearCandidates",tabId:tab.id});await show([])}catch(e){$("status").textContent=e.message}};
