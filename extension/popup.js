@@ -29,33 +29,35 @@ async function show(items){
  }
 }
 async function scanDom(tab){
- const r=await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},func:()=>{
-  const links=[];
+ const frames=await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},func:()=>{
+  const links=[],stats={anchors:0,videos:0,iframes:document.querySelectorAll("iframe").length,streams:0,blob:0,direct:0};
+  const direct=/\.(mp4|webm|mov)$/i;
+  const stream=/\.(m3u8|mpd)$/i;
+  const add=(url,label)=>{
+   if(!url)return;
+   try{
+    const u=new URL(url,document.baseURI);
+    if(u.protocol==="blob:"){stats.blob++;return}
+    if(!["https:","http:"].includes(u.protocol))return;
+    if(stream.test(u.pathname)){stats.streams++;return}
+    if(direct.test(u.pathname)){stats.direct++;links.push({url:u.href,label,source:"dom"})}
+   }catch{}
+  };
   for(const a of document.querySelectorAll("a[href]")){
+   stats.anchors++;
    const label=(a.textContent||"").replace(/\s+/g," ").trim().slice(0,100);
-   if(!a.hasAttribute("download")&&!/(다운로드|download|파일 받기)/i.test(label)&&!/\.(mp4|webm|mov)(?:$|[?#])/i.test(a.href))continue;
-   links.push({url:a.href,label:label||a.href,source:"dom"});
+   if(a.hasAttribute("download")||/(다운로드|download|파일 받기)/i.test(label)||direct.test(a.pathname))add(a.href,label||"공개 링크");
   }
-  for(const v of document.querySelectorAll("video[src],video source[src]"))links.push({url:v.src,label:"공개 video 태그",source:"dom"});
-  return links.slice(0,60);
+  for(const v of document.querySelectorAll("video,video source")){
+   stats.videos++;
+   add(v.currentSrc||v.src||v.getAttribute("src"),"공개 video 태그");
+  }
+  return {links:links.slice(0,60),stats};
  }});
- return r.flatMap(x=>x.result||[]).filter(x=>{try{return direct.test(new URL(x.url).pathname)}catch{return false}});
+ return {items:frames.flatMap(x=>x.result?.links||[]),stats:frames.reduce((acc,x)=>{
+  const s=x.result?.stats||{};
+  for(const key of ["anchors","videos","iframes","streams","blob","direct"])acc[key]=(acc[key]||0)+(s[key]||0);
+  return acc;
+ },{frames:frames.length})};
 }
-$("scan").onclick=async()=>{
- try{
-  const tab=await getTab();
-  const origin=new URL(tab.url).origin+"/*";
-  const permitted=await chrome.permissions.contains({origins:[origin]});
-  if(!permitted){
-   const granted=await chrome.permissions.request({origins:[origin]});
-   if(!granted)throw Error("사이트 접근 권한이 허용되지 않았습니다.");
-  }
-  let dom=[];
-  try{dom=await scanDom(tab)}catch(e){$("status").textContent="일부 프레임 분석 제한: "+e.message}
-  const network=await chrome.runtime.sendMessage({type:"getCandidates",tabId:tab.id});
-  if(network.error)throw Error(network.error);
-  await show([...dom,...(network.items||[])]);
-  if(!dom.length&&!(network.items||[]).length)$("status").textContent+="\n사이트 권한을 허용한 후 페이지를 새로고침하고, 허가된 영상의 공식 다운로드 링크가 표시되는지 확인한 뒤 다시 분석하세요.";
- }catch(e){$("status").textContent="분석 실패: "+e.message}
-};
-$("clear").onclick=async()=>{try{const tab=await getTab();await chrome.runtime.sendMessage({type:"clearCandidates",tabId:tab.id});await show([])}catch(e){$("status").textContent=e.message}};
+
