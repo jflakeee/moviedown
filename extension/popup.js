@@ -12,11 +12,24 @@ async function show(items){
   const li=document.createElement("li"),a=document.createElement("a");a.href=item.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=item.label||item.url;
   const small=document.createElement("small");small.textContent=item.source==="network"?"네트워크 요청":"페이지에 공개된 링크";
   const button=document.createElement("button");button.textContent="Drive 앱으로 전달";button.onclick=()=>chrome.tabs.create({url:"https://jflakeee.github.io/moviedown/?media="+encodeURIComponent(item.url)});
-  li.append(a,small,button);results.append(li);
+  const check=document.createElement("button");check.className="secondary";check.textContent="파일 확인";
+  const detail=document.createElement("small");
+  check.onclick=async()=>{
+   try{
+    const u=new URL(item.url);
+    if(!await chrome.permissions.contains({origins:[u.origin+"/*"]})){
+     if(!await chrome.permissions.request({origins:[u.origin+"/*"]}))throw Error("파일 호스트 권한이 필요합니다.");
+    }
+    const r=await chrome.runtime.sendMessage({type:"checkCandidate",tabId:currentTab.id,url:item.url});
+    if(r.error)throw Error(r.error);
+    detail.textContent=r.status==="reachable"?("HTTP "+r.httpStatus+" · "+(r.contentType||"형식 미확인")+" · "+(r.size===null?"크기 미확인":(r.size/1048576).toFixed(1)+" MiB")+" · Range "+(r.range?"지원":"미확인")):("확인 실패: "+r.status+" "+(r.httpStatus||""));
+   }catch(e){detail.textContent="확인 실패: "+e.message}
+  };
+  li.append(a,small,check,button,detail);results.append(li);
  }
 }
 async function scanDom(tab){
- const r=await chrome.scripting.executeScript({target:{tabId:tab.id,allFrames:true},func:()=>{
+ const r=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
   const links=[];
   for(const a of document.querySelectorAll("a[href]")){
    const label=(a.textContent||"").replace(/\s+/g," ").trim().slice(0,100);
@@ -26,7 +39,7 @@ async function scanDom(tab){
   for(const v of document.querySelectorAll("video[src],video source[src]"))links.push({url:v.src,label:"공개 video 태그",source:"dom"});
   return links.slice(0,60);
  }});
- return r.flatMap(x=>x.result||[]).filter(x=>direct.test(x.url||""));
+ return r.flatMap(x=>x.result||[]).filter(x=>{try{return direct.test(new URL(x.url).pathname)}catch{return false}});
 }
 $("scan").onclick=async()=>{
  try{
@@ -39,6 +52,7 @@ $("scan").onclick=async()=>{
   }
   const dom=await scanDom(tab);
   const network=await chrome.runtime.sendMessage({type:"getCandidates",tabId:tab.id});
+  if(network.error)throw Error(network.error);
   await show([...dom,...(network.items||[])]);
  }catch(e){$("status").textContent="분석 실패: "+e.message}
 };
