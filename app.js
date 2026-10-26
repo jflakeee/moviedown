@@ -2,6 +2,18 @@ const $=id=>document.getElementById(id);
 let token="",aborter=null;
 const log=s=>$("status").textContent=s;
 const key="moviedown_history";
+const sharedMedia=new URL(location.href).searchParams.get("media");
+if(sharedMedia){
+ try{
+  const u=new URL(sharedMedia);
+  if(["https:","http:"].includes(u.protocol)&&/\.(mp4|webm|mov)$/i.test(u.pathname)&&!u.username&&!u.password){
+   $("url").value=u.href;
+   history.replaceState(null,"",location.pathname+location.hash);
+   $("status").textContent="확장프로그램에서 탐지한 미디어 주소를 받았습니다. 파일 보관 권한을 확인하고 업로드하세요.";
+  }
+ }catch{}
+}
+
 function refresh(){const signed=!!token;const allowed=signed&&$("rights").checked;$("upload").disabled=!allowed;$("transfer").disabled=!allowed;$("createFolder").disabled=!signed;$("cancel").disabled=!aborter;$("logout").disabled=!signed}
 $("rights").addEventListener("change",refresh);
 refresh();
