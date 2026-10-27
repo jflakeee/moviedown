@@ -131,6 +131,11 @@ try {
   });
   assert.match(await page.title(), /Media to Drive v1\.0/);
   mark("app-loaded");
+  const incomingMedia = new URL("/sample.mp4", "http://127.0.0.1:" + server.address().port).href;
+  await page.goto("http://127.0.0.1:" + server.address().port + "/?media=" + encodeURIComponent(incomingMedia), {waitUntil:"domcontentloaded"});
+  assert.equal(await page.locator("#url").inputValue(), incomingMedia);
+  assert.equal(new URL(page.url()).searchParams.has("media"), false, "Media URL must be removed from address bar");
+  mark("app-receives-extension-media-url");
   await page.locator("#url").fill("https://example.com/movie.mp4");
   await page.locator("#pythonTest").click();
   await page.locator("#analysisSummary").getByText(/DIRECT_FILE/).waitFor({timeout:90000});
