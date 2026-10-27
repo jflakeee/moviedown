@@ -40,6 +40,15 @@ try {
     await context.waitForEvent("serviceworker", { timeout: 15000 });
   assert.ok(worker.url().startsWith("chrome-extension://"), "Extension worker missing");
   mark("extension-service-worker");
+  const extensionId = new URL(worker.url()).hostname;
+  const popup = await context.newPage();
+  await popup.goto("chrome-extension://" + extensionId + "/popup.html");
+  await popup.locator("#scan").waitFor();
+  await popup.locator("#clear").waitFor();
+  assert.equal(await popup.locator("#scan").isEnabled(), true);
+  assert.equal(await popup.locator("#clear").isEnabled(), true);
+  await popup.close();
+  mark("extension-popup-loaded");
   page = await context.newPage();
   await page.goto("http://127.0.0.1:" + server.address().port + "/", {
     waitUntil: "domcontentloaded"
