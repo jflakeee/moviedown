@@ -47,6 +47,14 @@ try {
   await popup.locator("#clear").waitFor();
   assert.equal(await popup.locator("#scan").isEnabled(), true);
   assert.equal(await popup.locator("#clear").isEnabled(), true);
+  await popup.locator("#scan").click();
+  await popup.locator("#status").getByText(/분석 실패:/).waitFor({ timeout: 15000 });
+  assert.match(await popup.locator("#status").innerText(), /일반 웹페이지/);
+  mark("popup-scan-error-handling");
+  await popup.locator("#clear").click();
+  await popup.locator("#status").getByText(/기록 삭제 실패:/).waitFor({ timeout: 15000 });
+  mark("popup-clear-error-handling");
+  await popup.screenshot({ path: path.join(reportDir, "extension-popup.png") });
   await popup.close();
   mark("extension-popup-loaded");
   page = await context.newPage();
