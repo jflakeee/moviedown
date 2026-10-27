@@ -104,7 +104,8 @@ try {
   await fixture.bringToFront();
   await fixturePopup.bringToFront();
   await worker.evaluate(async tabId => { await chrome.tabs.update(tabId, {active:true}); }, fixtureTabId);
-  await fixturePopup.locator("#scan").click();
+  // Dispatch without focusing the popup tab: Chrome otherwise changes the active tab.
+  await fixturePopup.evaluate(() => document.querySelector("#scan").click());
   await fixturePopup.waitForFunction(() => document.querySelector("#status")?.textContent?.includes("1개의 공개 미디어 링크 후보"), null, {timeout:15000});
   assert.equal(await fixturePopup.locator("#results li").count(), 1);
   assert.equal(await fixturePopup.locator("#results li a").first().getAttribute("href"), new URL("/sample.mp4", fixture.url()).href);
