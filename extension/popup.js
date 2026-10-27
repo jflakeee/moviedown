@@ -61,3 +61,47 @@ async function scanDom(tab){
  },{frames:frames.length})};
 }
 
+
+function setBusy(busy) {
+ $("scan").disabled = busy;
+ $("clear").disabled = busy;
+}
+function diagnosticsText(stats) {
+ return [
+  "검사한 프레임: " + (stats.frames || 0),
+  "링크: " + (stats.anchors || 0),
+  "비디오 요소: " + (stats.videos || 0),
+  "iframe: " + (stats.iframes || 0),
+  "직접 파일: " + (stats.direct || 0),
+  "스트림(HLS/DASH): " + (stats.streams || 0),
+  "blob 주소: " + (stats.blob || 0)
+ ].join("\n");
+}
+$("scan").addEventListener("click", async () => {
+ setBusy(true);
+ $("status").textContent = "현재 페이지를 분석하고 있습니다.";
+ try {
+  const tab = await getTab();
+  const dom = await scanDom(tab);
+  const response = await chrome.runtime.sendMessage({type:"getCandidates",tabId:tab.id});
+  if (response?.error) throw Error(response.error);
+  await show([...dom.items, ...(response.items || [])]);
+  $("diagnostics").textContent = diagnosticsText(dom.stats);
+ } catch (error) {
+  $("status").textContent = "분석 실패: " + String(error.message || error);
+  $("diagnostics").textContent = "페이지 접근 권한 또는 확장프로그램 상태를 확인하세요.";
+ } finally { setBusy(false); }
+});
+$("clear").addEventListener("click", async () => {
+ setBusy(true);
+ try {
+  const tab = await getTab();
+  const response = await chrome.runtime.sendMessage({type:"clearCandidates",tabId:tab.id});
+  if (response?.error) throw Error(response.error);
+  $("results").replaceChildren();
+  $("status").textContent = "이 탭의 탐지 기록을 지웠습니다.";
+  $("diagnostics").textContent = "분석 후 진단 정보가 표시됩니다.";
+ } catch (error) {
+  $("status").textContent = "기록 삭제 실패: " + String(error.message || error);
+ } finally { setBusy(false); }
+});
