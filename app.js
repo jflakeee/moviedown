@@ -154,7 +154,7 @@ async function api(url, options={}) {
   requireAuth();
   const headers = new Headers(options.headers || {});
   headers.set("Authorization", "Bearer " + token);
-  const response = await fetch(url, {...options, headers});
+  const response = await fetch(url, {...options, headers, redirect:"error"});
   if (!response.ok)
     throw Error("Google Drive API " + response.status + " " + (await response.text()).slice(0, 150));
   return response;
@@ -374,7 +374,7 @@ async function upload(name, size, getSlice, signal) {
     try {
       response = await fetch(session, {
         method:"PUT",headers:{"Content-Range":"bytes " + offset + "-" + (end - 1) + "/" + size,
-          "Content-Type":"application/octet-stream"},body,signal
+          "Content-Type":"application/octet-stream"},body,signal,redirect:"error"
       });
     } catch (error) {
       if (signal.aborted) throw error;
@@ -389,7 +389,7 @@ async function upload(name, size, getSlice, signal) {
     }
     if (response?.status !== 308) {
       response = await fetch(session, {method:"PUT",
-        headers:{"Content-Range":"bytes */" + size},signal});
+        headers:{"Content-Range":"bytes */" + size},signal,redirect:"error"});
       if (response.status === 200 || response.status === 201) {
         const file = await response.json();
         record(name, file.id);
