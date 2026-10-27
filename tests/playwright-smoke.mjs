@@ -138,11 +138,17 @@ try {
   mark("app-receives-extension-media-url");
   // Stub Google OAuth and Drive endpoints: no credentials or real upload.
   await page.route("https://www.googleapis.com/upload/drive/v3/files?**", async route => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, content-type, x-upload-content-type, x-upload-content-length"}});
+    }
     assert.equal(route.request().method(), "POST");
     assert.equal(route.request().headers()["authorization"], "Bearer smoke-test-token");
     await route.fulfill({status:200,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Expose-Headers":"Location","Location":"https://www.googleapis.com/upload/mock-session"},body:"{}"});
   });
   await page.route("https://www.googleapis.com/upload/mock-session", async route => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"PUT, OPTIONS","Access-Control-Allow-Headers":"content-range, content-type"}});
+    }
     assert.equal(route.request().method(), "PUT");
     assert.equal(route.request().headers()["content-range"], "bytes 0-3/4");
     await route.fulfill({status:200,contentType:"application/json",headers:{"Access-Control-Allow-Origin":"*"},body:JSON.stringify({id:"mockDriveFile123",name:"fixture.mp4"})});
