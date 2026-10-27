@@ -36,6 +36,9 @@ try {
     ]
   });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  context.on("page", opened => {
+    opened.on("pageerror", error => report.errors.push("Browser page error: " + String(error.message)));
+  });
   const worker = context.serviceWorkers()[0] ||
     await context.waitForEvent("serviceworker", { timeout: 15000 });
   assert.ok(worker.url().startsWith("chrome-extension://"), "Extension worker missing");
