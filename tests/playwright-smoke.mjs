@@ -162,6 +162,20 @@ try {
   assert.equal(await page.locator("#progress").inputValue(), "100");
   await page.locator("#history").getByRole("link", {name:/fixture.mp4/}).waitFor();
   mark("mock-drive-resumable-upload");
+  // A forged session URL must never receive video bytes.
+  let unsafeUploadAttempted = false;
+  await page.unroute("https://www.googleapis.com/upload/drive/v3/files?**");
+  await page.route("https://www.googleapis.com/upload/drive/v3/files?**", route =>
+    route.fulfill({status:200,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Expose-Headers":"Location","Location":"https://untrusted.example/upload/steal"},body:"{}"}));
+  await page.route("https://untrusted.example/**", route => {
+    unsafeUploadAttempted = true;
+    return route.abort();
+  });
+  await page.locator("#upload").click();
+  await page.locator("#jobs").getByText(/허용되지 않은 Drive 업로드 세션 주소/).waitFor({timeout:15000});
+  assert.equal(unsafeUploadAttempted, false, "Video bytes sent to an untrusted session host");
+  mark("rejects-untrusted-drive-upload-session");
+
 
   await page.locator("#url").fill("https://example.com/movie.mp4");
   await page.locator("#pythonTest").click();
