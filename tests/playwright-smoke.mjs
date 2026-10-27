@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { readFile, mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { readFile, mkdtemp, rm, mkdir, writeFile, cp } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import assert from "node:assert/strict";
@@ -33,6 +33,12 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const profile = await mkdtemp(path.join(os.tmpdir(), "md-smoke-"));
+const testExtension = path.join(profile, "extension");
+await cp(path.join(root, "extension"), testExtension, {recursive:true});
+const manifestFile = path.join(testExtension, "manifest.json");
+const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
+manifest.host_permissions.push("http://127.0.0.1/*");
+await writeFile(manifestFile, JSON.stringify(manifest));
 let context;
 try {
   context = await chromium.launchPersistentContext(profile, {
