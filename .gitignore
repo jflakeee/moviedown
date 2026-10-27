@@ -1,0 +1,16 @@
+# Local credentials and runtime data — never commit
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.zip
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
