@@ -92,3 +92,19 @@ In a browser, test these scenarios:
 - Browser integration tests and Drive resumable-upload recovery testing.
 - Optional, independently hosted Playwright service for explicitly authorized site analysis, with DNS/IP/redirect protections if enabled.
 - Improved extension-to-page URL transfer to avoid placing signed link query strings in navigational URLs.
+
+## Optional GitHub Actions Playwright smoke test
+
+The workflow [Playwright Chromium Extension Smoke Test](.github/workflows/playwright-smoke.yml)
+is manually triggered from **Actions → Playwright Chromium Extension Smoke Test → Run workflow**.
+
+It installs Playwright Chromium on an ephemeral Ubuntu runner, loads the unpacked
+Media to Drive Chrome extension with a persistent Chromium context, and tests
+the local web app's Pyodide MP4/HLS classification. No user-supplied website
+is visited, no VPN is installed, and no Google credentials are required.
+
+This is an **on-demand integration test**, not a public API, continuously running
+browser, VPN gateway, or video extraction service. GitHub-hosted runners are
+ephemeral. The test requires external access to the Pyodide CDN, so CDN outages
+can fail it. Inspect the workflow logs for actual results; committing a workflow
+does not execute it.
