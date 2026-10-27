@@ -158,9 +158,9 @@ try {
   await page.locator("#rights").check();
   await page.locator("#file").setInputFiles({name:"fixture.mp4",mimeType:"video/mp4",buffer:Buffer.from([0,1,2,3])});
   await page.locator("#upload").click();
-  await page.getByText("Drive 저장 완료: fixture.mp4").waitFor({timeout:15000});
+  await page.locator("#jobs").getByText(/Drive 저장 완료: fixture.mp4/).waitFor({timeout:15000});
   assert.equal(await page.locator("#progress").inputValue(), "100");
-  await page.getByRole("link", {name:/fixture.mp4/}).waitFor();
+  await page.locator("#history").getByRole("link", {name:/fixture.mp4/}).waitFor();
   mark("mock-drive-resumable-upload");
 
   await page.locator("#url").fill("https://example.com/movie.mp4");
