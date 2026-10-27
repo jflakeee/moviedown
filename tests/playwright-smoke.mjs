@@ -73,6 +73,9 @@ try {
   await fixture.locator("a[download]").waitFor();
   const fixtureUrl = await fixture.locator("a[download]").getAttribute("href");
   assert.equal(new URL(fixtureUrl, fixture.url()).pathname, "/sample.mp4");
+  const fixtureLinks = await fixture.evaluate(() => [...document.querySelectorAll("a[download], video[src]")].map(el => new URL(el.getAttribute("href") || el.getAttribute("src"), document.baseURI).href));
+  assert.equal(fixtureLinks.length, 2);
+  assert.ok(fixtureLinks.every(url => url.endsWith("/sample.mp4")));
   mark("local-public-media-fixture");
   await fixture.close();
   page = await context.newPage();
