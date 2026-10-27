@@ -1,6 +1,17 @@
 name: Playwright Chromium Extension Smoke Test
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'index.html'
+      - 'python/**'
+      - 'python-client.js'
+      - 'python-worker.js'
+      - 'extension/**'
+      - 'tests/playwright-smoke.mjs'
+      - '.github/workflows/playwright-smoke.yml'
 permissions:
   contents: read
 concurrency:
