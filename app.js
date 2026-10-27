@@ -53,6 +53,20 @@ function refresh() {
 $("rights").addEventListener("change", refresh);
 refresh();
 
+function isLocalOrPrivateHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") ||
+      host === "::1" || host === "::" || host.startsWith("fe80:") ||
+      host.startsWith("fc") || host.startsWith("fd")) return true;
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false;
+  const parts = host.split(".").map(Number);
+  return parts.some(part => part > 255) || parts[0] === 0 ||
+    parts[0] === 10 || parts[0] === 127 ||
+    (parts[0] === 169 && parts[1] === 254) ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+    (parts[0] === 192 && parts[1] === 168);
+}
+
 const sharedMedia = new URL(location.href).searchParams.get("media");
 if (sharedMedia) {
   // Never retain incoming signed URLs in the browser's visible address bar.
@@ -60,7 +74,8 @@ if (sharedMedia) {
   try {
     const u = new URL(sharedMedia);
     if (["https:", "http:"].includes(u.protocol) &&
-        /\.(mp4|webm|mov)$/i.test(u.pathname) && !u.username && !u.password) {
+        /\.(mp4|webm|mov)$/i.test(u.pathname) && !u.username && !u.password &&
+        !isLocalOrPrivateHost(u.hostname)) {
       $("url").value = u.href;
       log("확장프로그램에서 직접 파일 주소를 받았습니다. 보관 권한을 확인하세요.");
     }
