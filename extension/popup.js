@@ -2,7 +2,21 @@ const $=id=>document.getElementById(id);
 let currentTab=null;
 const direct=/\.(mp4|webm|mov)(?:$|[?#])/i;
 function safeUrl(raw){try{const u=new URL(raw);return ["https:","http:"].includes(u.protocol)&&!u.username&&!u.password?u.href:null}catch{return null}}
-async function getTab(){const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id||!/^https?:\/\//.test(tab.url||""))throw Error("일반 웹페이지에서만 분석할 수 있습니다.");currentTab=tab;return tab}
+async function getTab(){
+ const [active]=await chrome.tabs.query({active:true,currentWindow:true});
+ let tab=active;
+ // In browser automation the popup is opened as a regular extension tab.
+ // Prefer the most recently accessed web tab only in that special case.
+ if(tab?.url?.startsWith(chrome.runtime.getURL(""))){
+  const tabs=await chrome.tabs.query({currentWindow:true});
+  tab=tabs.filter(t=>/^https?:\/\//.test(t.url||""))
+    .sort((a,b)=>(b.lastAccessed||0)-(a.lastAccessed||0))[0];
+ }
+ if(!tab?.id||!/^https?:\/\//.test(tab.url||""))
+  throw Error("일반 웹페이지에서만 분석할 수 있습니다.");
+ currentTab=tab;
+ return tab;
+}
 async function show(items){
  const results=$("results");results.replaceChildren();
  const unique=[...new Map(items.filter(x=>safeUrl(x.url)).map(x=>[x.url,x])).values()];
