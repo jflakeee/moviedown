@@ -125,6 +125,9 @@ try {
   await fixturePopup.close();
   mark("local-public-media-fixture");
   await fixture.close();
+  // Prevent the real Google Identity script from racing with the deterministic OAuth stub.
+  await context.route("https://accounts.google.com/gsi/client", route =>
+    route.fulfill({status:200,contentType:"application/javascript",body:""}));
   page = await context.newPage();
   await page.goto("http://127.0.0.1:" + server.address().port + "/", {
     waitUntil: "domcontentloaded"
