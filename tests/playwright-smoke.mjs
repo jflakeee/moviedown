@@ -35,6 +35,7 @@ try {
       "--load-extension=" + path.join(root, "extension")
     ]
   });
+  await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   const worker = context.serviceWorkers()[0] ||
     await context.waitForEvent("serviceworker", { timeout: 15000 });
   assert.ok(worker.url().startsWith("chrome-extension://"), "Extension worker missing");
@@ -65,6 +66,11 @@ try {
   try { if (page) await page.screenshot({ path: path.join(reportDir, "app-final.png"), fullPage: true }); }
   catch (error) { report.errors.push("Screenshot: " + String(error)); }
   await writeFile(path.join(reportDir, "report.json"), JSON.stringify(report, null, 2));
+  if (context) {
+    try {
+      await context.tracing.stop(report.errors.length ? { path: path.join(reportDir, "trace.zip") } : {});
+    } catch (error) { console.warn("Trace save failed:", String(error)); }
+  }
   await context?.close();
   await new Promise(resolve => server.close(resolve));
   await rm(profile, {recursive:true,force:true});
