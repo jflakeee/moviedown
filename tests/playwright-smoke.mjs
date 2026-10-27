@@ -12,6 +12,14 @@ const report = { startedAt: new Date().toISOString(), checks: [], errors: [] };
 const mark = name => report.checks.push({ name, passed: true });
 let page;
 const server = createServer(async (req, res) => {
+  if (new URL(req.url, "http://127.0.0.1").pathname === "/fixture") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end('<!doctype html><title>Public media fixture</title><a download href="/sample.mp4">다운로드</a><video src="/sample.mp4" controls></video>');
+    return;
+  }
+  if (new URL(req.url, "http://127.0.0.1").pathname === "/sample.mp4") {
+    res.writeHead(200, { "content-type": "video/mp4", "content-length": "0" }); res.end(); return;
+  }
   const pathname = new URL(req.url, "http://127.0.0.1").pathname;
   const filename = path.resolve(root, "." + (pathname === "/" ? "/index.html" : decodeURIComponent(pathname)));
   if (!filename.startsWith(root + path.sep)) { res.writeHead(403); res.end(); return; }
@@ -60,6 +68,13 @@ try {
   await popup.screenshot({ path: path.join(reportDir, "extension-popup.png") });
   await popup.close();
   mark("extension-popup-loaded");
+  const fixture = await context.newPage();
+  await fixture.goto("http://127.0.0.1:" + server.address().port + "/fixture");
+  await fixture.locator("a[download]").waitFor();
+  const fixtureUrl = await fixture.locator("a[download]").getAttribute("href");
+  assert.equal(new URL(fixtureUrl, fixture.url()).pathname, "/sample.mp4");
+  mark("local-public-media-fixture");
+  await fixture.close();
   page = await context.newPage();
   await page.goto("http://127.0.0.1:" + server.address().port + "/", {
     waitUntil: "domcontentloaded"
