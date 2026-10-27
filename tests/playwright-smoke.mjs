@@ -76,6 +76,23 @@ try {
   const fixtureLinks = await fixture.evaluate(() => [...document.querySelectorAll("a[download], video[src]")].map(el => new URL(el.getAttribute("href") || el.getAttribute("src"), document.baseURI).href));
   assert.equal(fixtureLinks.length, 2);
   assert.ok(fixtureLinks.every(url => url.endsWith("/sample.mp4")));
+  const fixtureTabId = await worker.evaluate(async targetUrl => {
+    const tabs = await chrome.tabs.query({});
+    const tab = tabs.find(item => item.url === targetUrl);
+    if (!tab) throw Error("Fixture tab not found");
+    return tab.id;
+  }, fixture.url());
+  const extracted = await worker.evaluate(async tabId => {
+    const frames = await chrome.scripting.executeScript({
+      target: {tabId, allFrames:true},
+      func: () => [...document.querySelectorAll("a[href], video[src], video source[src]")]
+        .map(el => el.href || el.currentSrc || el.src)
+        .filter(Boolean)
+    });
+    return frames.flatMap(frame => frame.result || []);
+  }, fixtureTabId);
+  assert.ok(extracted.filter(url => url.endsWith("/sample.mp4")).length >= 2);
+  mark("extension-scripting-public-links");
   mark("local-public-media-fixture");
   await fixture.close();
   page = await context.newPage();
