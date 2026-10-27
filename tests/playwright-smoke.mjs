@@ -136,6 +136,33 @@ try {
   assert.equal(await page.locator("#url").inputValue(), incomingMedia);
   assert.equal(new URL(page.url()).searchParams.has("media"), false, "Media URL must be removed from address bar");
   mark("app-receives-extension-media-url");
+  // Stub Google OAuth and Drive endpoints: no credentials or real upload.
+  await page.route("https://www.googleapis.com/upload/drive/v3/files?**", async route => {
+    assert.equal(route.request().method(), "POST");
+    assert.equal(route.request().headers()["authorization"], "Bearer smoke-test-token");
+    await route.fulfill({status:200,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Expose-Headers":"Location","Location":"https://www.googleapis.com/upload/mock-session"},body:"{}"});
+  });
+  await page.route("https://www.googleapis.com/upload/mock-session", async route => {
+    assert.equal(route.request().method(), "PUT");
+    assert.equal(route.request().headers()["content-range"], "bytes 0-3/4");
+    await route.fulfill({status:200,contentType:"application/json",headers:{"Access-Control-Allow-Origin":"*"},body:JSON.stringify({id:"mockDriveFile123",name:"fixture.mp4"})});
+  });
+  await page.evaluate(() => {
+    window.MOVIEDOWN_CONFIG = {googleClientId:"test-client.apps.googleusercontent.com"};
+    window.google = {accounts:{oauth2:{initTokenClient:({callback})=>({
+      requestAccessToken:()=>callback({access_token:"smoke-test-token",expires_in:3600})
+    })}}};
+  });
+  await page.locator("#login").click();
+  await page.getByRole("button", {name:"Google 로그인됨"}).waitFor();
+  await page.locator("#rights").check();
+  await page.locator("#file").setInputFiles({name:"fixture.mp4",mimeType:"video/mp4",buffer:Buffer.from([0,1,2,3])});
+  await page.locator("#upload").click();
+  await page.getByText("Drive 저장 완료: fixture.mp4").waitFor({timeout:15000});
+  assert.equal(await page.locator("#progress").inputValue(), "100");
+  await page.getByRole("link", {name:/fixture.mp4/}).waitFor();
+  mark("mock-drive-resumable-upload");
+
   await page.locator("#url").fill("https://example.com/movie.mp4");
   await page.locator("#pythonTest").click();
   await page.locator("#analysisSummary").getByText(/DIRECT_FILE/).waitFor({timeout:90000});
