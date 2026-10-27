@@ -344,6 +344,11 @@ async function upload(name, size, getSlice, signal) {
   });
   const session = init.headers.get("Location");
   if (!session) throw Error("Drive 업로드 세션을 받지 못했습니다.");
+  let sessionUrl;
+  try { sessionUrl = new URL(session); } catch { throw Error("Drive 업로드 세션 주소가 올바르지 않습니다."); }
+  if (sessionUrl.protocol !== "https:" || sessionUrl.hostname !== "www.googleapis.com" ||
+      sessionUrl.username || sessionUrl.password || !sessionUrl.pathname.startsWith("/upload/"))
+    throw Error("허용되지 않은 Drive 업로드 세션 주소입니다.");
   let offset = 0;
   while (offset < size) {
     if (signal.aborted) throw Error("취소됨");
