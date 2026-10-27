@@ -1,4 +1,4 @@
-name: Deploy GitHub Pages
+name: Test and deploy GitHub Pages
 on:
   push:
     branches: [main]
@@ -11,7 +11,30 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python extractor tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: JavaScript task tests
+        run: npm run test:js
+      - name: JavaScript syntax checks
+        run: |
+          node --check app.js
+          node --check task-manager.js
+          node --check python-client.js
+          node --check python-worker.js
+          node --check extension/background.js
+          node --check extension/popup.js
   deploy:
+    needs: test
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
