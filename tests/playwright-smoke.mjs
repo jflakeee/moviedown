@@ -109,6 +109,18 @@ try {
   assert.equal(await fixturePopup.locator("#results li").count(), 1);
   assert.equal(await fixturePopup.locator("#results li a").first().getAttribute("href"), new URL("/sample.mp4", fixture.url()).href);
   mark("popup-detects-public-media");
+  await context.route("https://jflakeee.github.io/moviedown/**", route => route.fulfill({status:200,contentType:"text/html",body:"<!doctype html><title>Transfer captured</title>"}));
+  const [handoff] = await Promise.all([
+    context.waitForEvent("page", {timeout:15000}),
+    fixturePopup.getByRole("button", {name:"Drive 앱으로 전달"}).click()
+  ]);
+  await handoff.waitForLoadState("domcontentloaded");
+  const target = new URL(handoff.url());
+  assert.equal(target.origin, "https://jflakeee.github.io");
+  assert.equal(target.pathname, "/moviedown/");
+  assert.equal(target.searchParams.get("media"), new URL("/sample.mp4", fixture.url()).href);
+  await handoff.close();
+  mark("popup-drive-handoff-url");
   await fixturePopup.screenshot({path:path.join(reportDir,"extension-fixture.png")});
   await fixturePopup.close();
   mark("local-public-media-fixture");
