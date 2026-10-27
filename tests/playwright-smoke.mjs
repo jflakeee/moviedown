@@ -137,11 +137,14 @@ try {
   assert.equal(new URL(page.url()).searchParams.has("media"), false, "Media URL must be removed from address bar");
   mark("app-receives-extension-media-url");
   // Stub Google OAuth and Drive endpoints: no credentials or real upload.
+  let uploadSessionRequests = 0;
+  let uploadChunkRequests = 0;
   await page.route("https://www.googleapis.com/upload/drive/v3/files?**", async route => {
     if (route.request().method() === "OPTIONS") {
       return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, content-type, x-upload-content-type, x-upload-content-length"}});
     }
     assert.equal(route.request().method(), "POST");
+    uploadSessionRequests++;
     assert.equal(route.request().headers()["authorization"], "Bearer smoke-test-token");
     await route.fulfill({status:200,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Expose-Headers":"Location","Location":"https://www.googleapis.com/upload/mock-session"},body:"{}"});
   });
@@ -150,6 +153,7 @@ try {
       return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"PUT, OPTIONS","Access-Control-Allow-Headers":"content-range, content-type"}});
     }
     assert.equal(route.request().method(), "PUT");
+    uploadChunkRequests++;
     assert.equal(route.request().headers()["content-range"], "bytes 0-3/4");
     await route.fulfill({status:200,contentType:"application/json",headers:{"Access-Control-Allow-Origin":"*"},body:JSON.stringify({id:"mockDriveFile123",name:"fixture.mp4"})});
   });
@@ -167,6 +171,8 @@ try {
   await page.locator("#jobs").getByText(/Drive 저장 완료: fixture.mp4/).waitFor({timeout:15000});
   assert.equal(await page.locator("#progress").inputValue(), "100");
   await page.locator("#history").getByRole("link", {name:/fixture.mp4/}).waitFor();
+  assert.equal(uploadSessionRequests, 1, "Expected exactly one Drive upload session");
+  assert.equal(uploadChunkRequests, 1, "Expected exactly one uploaded chunk");
   mark("mock-drive-resumable-upload");
   // A forged session URL must never receive video bytes.
   let unsafeUploadAttempted = false;
