@@ -136,6 +136,19 @@ try {
   assert.equal(await page.locator("#url").inputValue(), incomingMedia);
   assert.equal(new URL(page.url()).searchParams.has("media"), false, "Media URL must be removed from address bar");
   mark("app-receives-extension-media-url");
+  for (const invalidMedia of [
+    "javascript:alert(1)",
+    "https://user:pass@example.com/video.mp4",
+    "https://example.com/playlist.m3u8",
+    "https://example.com/watch"
+  ]) {
+    await page.goto("http://127.0.0.1:" + server.address().port + "/?media=" + encodeURIComponent(invalidMedia), {waitUntil:"domcontentloaded"});
+    assert.equal(await page.locator("#url").inputValue(), "", "Rejected unsafe or non-direct media: " + invalidMedia);
+    assert.equal(new URL(page.url()).searchParams.has("media"), false);
+  }
+  mark("app-rejects-invalid-handoff-urls");
+  await page.goto("http://127.0.0.1:" + server.address().port + "/", {waitUntil:"domcontentloaded"});
+
   // Stub Google OAuth and Drive endpoints: no credentials or real upload.
   let uploadSessionRequests = 0;
   let uploadChunkRequests = 0;
