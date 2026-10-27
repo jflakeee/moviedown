@@ -45,8 +45,8 @@ try {
     channel: "chromium",
     headless: false,
     args: [
-      "--disable-extensions-except=" + path.join(root, "extension"),
-      "--load-extension=" + path.join(root, "extension")
+      "--disable-extensions-except=" + testExtension,
+      "--load-extension=" + testExtension
     ]
   });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
@@ -99,6 +99,17 @@ try {
   }, fixtureTabId);
   assert.ok(extracted.filter(url => url.endsWith("/sample.mp4")).length >= 2);
   mark("extension-scripting-public-links");
+  const fixturePopup = await context.newPage();
+  await fixturePopup.goto("chrome-extension://" + extensionId + "/popup.html");
+  await fixture.bringToFront();
+  await fixturePopup.bringToFront();
+  await fixturePopup.locator("#scan").click();
+  await fixturePopup.waitForFunction(() => document.querySelector("#status")?.textContent?.includes("1개의 공개 미디어 링크 후보"), null, {timeout:15000});
+  assert.equal(await fixturePopup.locator("#results li").count(), 1);
+  assert.equal(await fixturePopup.locator("#results li a").first().getAttribute("href"), new URL("/sample.mp4", fixture.url()).href);
+  mark("popup-detects-public-media");
+  await fixturePopup.screenshot({path:path.join(reportDir,"extension-fixture.png")});
+  await fixturePopup.close();
   mark("local-public-media-fixture");
   await fixture.close();
   page = await context.newPage();
